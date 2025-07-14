@@ -10,3 +10,6 @@ server/venv/
 
 # System
 .DS_Store
+
+# Python virtual environment
+server/env/
