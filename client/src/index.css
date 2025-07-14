@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Optional: smooth font & base reset */
+body {
+  font-family: 'Inter', 'Poppins', sans-serif;
+  background-color: #f5f6fa;
+}
