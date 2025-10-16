@@ -32,6 +32,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+server/env/
 env/
 venv/
 ENV/
