@@ -1,26 +1,25 @@
-// utils/topics.js
 export const speakTopics = [
-  "How has technology impacted education?",
-  "Describe your dream vacation.",
-  "What are the pros and cons of online learning?",
-  "Talk about your favorite hobby.",
-  "Explain why teamwork is important.",
-  "How do you manage stress during exams?",
-  "What does success mean to you?",
-  "Describe a special day in your life.",
-  "Talk about a book or movie you enjoyed recently.",
-  "Why is time management important?",
+  "Describe your favorite hobby and why you enjoy it.",
+  "Talk about a memorable vacation you had.",
+  "Explain how to prepare your favorite dish.",
+  "Describe a person who inspires you.",
+  "Talk about your goals for the next 5 years."
 ];
 
 export const writeTopics = [
-  "Describe your favorite festival.",
-  "How would you spend a million dollars?",
-  "Write about a person who inspires you.",
-  "Explain the importance of environmental protection.",
-  "What is your opinion on mobile phones in school?",
-  "Write a letter to your future self.",
-  "Describe a tradition you follow at home.",
-  "Should homework be banned? Explain.",
-  "What is your dream job and why?",
-  "Describe a goal you have and how you'll achieve it.",
+  "Write about the importance of learning English.",
+  "Explain a situation where you overcame a challenge.",
+  "Write about your favorite book or movie and why.",
+  "Describe your dream job and what it involves.",
+  "Discuss the advantages and disadvantages of social media."
 ];
+
+export const describeImages = [
+  "https://o.quizlet.com/mxU6zv2onPHfdpWkhKDOcg_b.jpg",
+  "https://images.unsplash.com/photo-1495567720989-cebdbdd97913",
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+  "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6",
+  "https://images.unsplash.com/photo-1506744038136-46273834b3fb"
+];
+
+

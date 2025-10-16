@@ -1,41 +1,51 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
+// Pages
+import Dashboard from "./pages/Dashboard";
+import Write from "./pages/Write";
+import Speak from "./pages/Speak";
+import Describe from "./pages/Describe";
+import Streaks from "./pages/Streaks";
+import Home from "./pages/Home";
+import Profile from "./pages/Profile";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+
+// Layout
+import Navbar from "./components/Navbar";
+
+// Context
+import { AuthProvider } from "./context/AuthContext";
+
+// Toast
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Speak from "./pages/Speak";
-import Write from "./pages/Write";
-import Dashboard from "./pages/Dashboard";
-import Layout from "./layout/Layout";
-import Describe from "./pages/Describe";
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Profile from './pages/Profile';
 
-
-function App() {
+export default function App() {
   const [refreshCount, setRefreshCount] = useState(0);
-  const triggerRefresh = () => setRefreshCount((prev) => prev + 1);
+
+  const handleProgressUpdate = () => {
+    setRefreshCount((prev) => prev + 1); // trigger dashboard re-fetch
+  };
+
   return (
-    <Router>
-      <Layout>
+    <AuthProvider>
+      <Router>
+        <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
-           <Route path="/speak" element={<Speak onProgressUpdate={triggerRefresh} />} />
-          <Route path="/write" element={<Write onProgressUpdate={triggerRefresh} />} />
-          <Route path="/dashboard" element={<Dashboard refresh={refreshCount} />} />
-          <Route path="/describe" element={<Describe onProgressUpdate={triggerRefresh} />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard" element={<Dashboard refresh={refreshCount} />} />
+          <Route path="/speak" element={<Speak onProgressUpdate={handleProgressUpdate} />} />
+          <Route path="/write" element={<Write onProgressUpdate={handleProgressUpdate} />} />
+          <Route path="/describe" element={<Describe onProgressUpdate={handleProgressUpdate} />} />
+          <Route path="/streaks" element={<Streaks />} />
           <Route path="/profile" element={<Profile />} />
-        
         </Routes>
-      </Layout>
-       <ToastContainer position="top-right" autoClose={3000} />
-    </Router>
-    
+        <ToastContainer position="top-center" autoClose={3000} />
+      </Router>
+    </AuthProvider>
   );
 }
-
-export default App;

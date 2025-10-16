@@ -1,0 +1,232 @@
+name: 🔄 Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Frontend Testing
+  frontend-test:
+    name: 🎨 Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+        
+    - name: 📥 Install dependencies
+      run: |
+        cd client
+        npm ci
+        
+    - name: 🔍 Lint code
+      run: |
+        cd client
+        npm run lint
+        
+    - name: 🧪 Run tests
+      run: |
+        cd client
+        npm run test -- --coverage --watchAll=false
+        
+    - name: 🏗️ Build application
+      run: |
+        cd client
+        npm run build
+        
+    - name: 📊 Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./client/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  # Backend Testing
+  backend-test:
+    name: 🔧 Backend Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, '3.10']
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: 📦 Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: 📥 Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov black isort flake8
+        
+    - name: 🔍 Lint with flake8
+      run: |
+        cd backend
+        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: 🎨 Check code formatting with black
+      run: |
+        cd backend
+        black --check app
+        
+    - name: 📦 Check import sorting with isort
+      run: |
+        cd backend
+        isort --check-only app
+        
+    - name: 🧪 Run tests with pytest
+      run: |
+        cd backend
+        pytest --cov=app --cov-report=xml --cov-report=html
+        
+    - name: 📊 Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  # Security Scanning
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔍 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: 📊 Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Dependency Check
+  dependency-check:
+    name: 📦 Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: 🔍 Audit frontend dependencies
+      run: |
+        cd client
+        npm audit --audit-level=high
+        
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: 🔍 Check backend dependencies with safety
+      run: |
+        cd backend
+        pip install safety
+        safety check -r requirements.txt
+
+  # Build and Deploy (only on main branch)
+  deploy:
+    name: 🚀 Deploy
+    needs: [frontend-test, backend-test, security-scan, dependency-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: client/package-lock.json
+        
+    - name: 🏗️ Build frontend
+      run: |
+        cd client
+        npm ci
+        npm run build
+        
+    - name: 🚀 Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      if: success()
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        working-directory: ./client
+        
+    - name: 🚀 Deploy backend to Railway
+      uses: bervProject/railway-deploy@v1.0.0
+      if: success()
+      with:
+        railway_token: ${{ secrets.RAILWAY_TOKEN }}
+        service: "backend"
+
+  # Notification
+  notify:
+    name: 📢 Notify
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📢 Notify on success
+      if: needs.deploy.result == 'success'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: '✅ FluentEase deployed successfully!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+    - name: 📢 Notify on failure
+      if: needs.deploy.result == 'failure'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: '❌ FluentEase deployment failed!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

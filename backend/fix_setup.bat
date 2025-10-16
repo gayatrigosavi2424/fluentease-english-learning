@@ -1,0 +1,23 @@
+@echo off
+echo Fixing backend setup...
+
+echo Step 1: Removing old virtual environment...
+if exist venv rmdir /s /q venv
+
+echo Step 2: Creating new virtual environment...
+python -m venv venv
+
+echo Step 3: Activating virtual environment...
+call venv\Scripts\activate
+
+echo Step 4: Upgrading pip...
+python -m pip install --upgrade pip
+
+echo Step 5: Installing requirements...
+pip install -r requirements.txt
+
+echo Step 6: Testing installation...
+python -c "import fastapi; print('FastAPI installed successfully!')"
+
+echo Setup complete! Now run: python start.py
+pause
