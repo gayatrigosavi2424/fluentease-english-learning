@@ -834,134 +834,67 @@ export default function Speak({ onProgressUpdate }) {
           <div className="space-y-4">
             {/* Overall Score */}
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-300 shadow-sm text-center">
-              <h3 className="font-bold text-xl text-blue-800 mb-2">🎯 Overall Score</h3>
+              <h3 className="font-bold text-xl text-blue-800 mb-2">🎯 Your Score</h3>
               <div className="text-4xl font-bold text-blue-600">{feedback.score || 0}/10</div>
             </div>
 
-            {/* Detailed Scores */}
-            {feedback.detailed_scores && Object.keys(feedback.detailed_scores).length > 0 && (
-              <div className="bg-purple-50 p-4 rounded-xl border border-purple-300 shadow-sm">
-                <h3 className="font-bold text-lg text-purple-800 mb-3">📊 Detailed Scores</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {Object.entries(feedback.detailed_scores).map(([category, score]) => (
-                    <div key={category} className="text-center bg-white p-3 rounded-lg">
-                      <div className="text-sm font-medium text-gray-600 capitalize">{category}</div>
-                      <div className="text-2xl font-bold text-purple-600">{score}/10</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Speech Analysis Stats */}
-            {feedback.speechAnalysis && (
-              <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-300 shadow-sm">
-                <h3 className="font-bold text-lg text-indigo-800 mb-3">📊 Speech Analysis</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div className="bg-white p-2 rounded text-center">
-                    <div className="font-semibold text-indigo-600">{feedback.speechAnalysis.wordCount}</div>
-                    <div className="text-gray-600">Words</div>
-                  </div>
-                  <div className="bg-white p-2 rounded text-center">
-                    <div className="font-semibold text-indigo-600">{feedback.speechAnalysis.sentenceCount}</div>
-                    <div className="text-gray-600">Sentences</div>
-                  </div>
-                  <div className="bg-white p-2 rounded text-center">
-                    <div className="font-semibold text-indigo-600">{feedback.speechAnalysis.wordsPerMinute}</div>
-                    <div className="text-gray-600">WPM</div>
+            {/* AI Feedback from Gemini - MAIN SECTION */}
+            {feedback.aiFeedback && (
+              <div className="bg-white p-6 rounded-xl border-2 border-purple-300 shadow-lg">
+                <h3 className="font-bold text-xl text-purple-800 mb-4 flex items-center">
+                  <span className="text-2xl mr-2">🤖</span>
+                  AI Grammar & Fluency Analysis
+                </h3>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed">
+                    {feedback.aiFeedback}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Exact Mistakes */}
-            <div className="bg-red-50 p-4 rounded-xl border border-red-300 shadow-sm">
-              <h3 className="font-bold text-lg text-red-800 mb-3">
-                🔍 Exact Speech Analysis ({feedback.exactMistakes?.length || 0} issues found)
-              </h3>
-              
-              {feedback.exactMistakes && feedback.exactMistakes.length > 0 ? (
-                <div className="space-y-4">
+            {/* Exact Grammar Mistakes - SIMPLIFIED */}
+            {feedback.exactMistakes && feedback.exactMistakes.length > 0 && (
+              <div className="bg-red-50 p-4 rounded-xl border border-red-300 shadow-sm">
+                <h3 className="font-bold text-lg text-red-800 mb-3">
+                  ❌ Grammar Mistakes Found: {feedback.exactMistakes.length}
+                </h3>
+                
+                <div className="space-y-3">
                   {feedback.exactMistakes.map((mistake, index) => (
                     <div key={index} className="bg-white p-3 rounded-lg border border-red-200">
-                      <div className="flex items-center mb-2">
-                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold mr-2">
-                          {mistake.type}
-                        </span>
-                        <span className="text-sm text-gray-600">Issue #{index + 1}</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center">
-                          <span className="text-red-600 font-medium mr-2">❌ What you said:</span>
-                          <span className="bg-red-100 px-2 py-1 rounded text-red-800 font-mono text-sm">
+                      <div className="space-y-2">
+                        <div className="flex items-start">
+                          <span className="text-red-600 font-medium mr-2 min-w-fit">❌ Wrong:</span>
+                          <span className="bg-red-100 px-2 py-1 rounded text-red-800 text-sm">
                             {mistake.wrong}
                           </span>
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-green-600 font-medium mr-2">✅ Should be:</span>
-                          <span className="bg-green-100 px-2 py-1 rounded text-green-800 font-mono text-sm">
+                        <div className="flex items-start">
+                          <span className="text-green-600 font-medium mr-2 min-w-fit">✅ Correct:</span>
+                          <span className="bg-green-100 px-2 py-1 rounded text-green-800 text-sm">
                             {mistake.correct}
                           </span>
                         </div>
                         <div className="flex items-start">
-                          <span className="text-blue-600 font-medium mr-2">📝 Explanation:</span>
+                          <span className="text-blue-600 font-medium mr-2 min-w-fit">📝 Why:</span>
                           <span className="text-blue-700 text-sm">{mistake.rule}</span>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <div className="text-green-600 text-lg font-semibold mb-2">🎉 Excellent Speaking!</div>
-                  <p className="text-green-700">No grammar, pronunciation, or fluency errors detected.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Strengths */}
-            {feedback.strengths && feedback.strengths.length > 0 && (
-              <div className="bg-green-50 p-4 rounded-xl border border-green-300 shadow-sm">
-                <h3 className="font-bold text-lg text-green-800 mb-3">✅ Your Strengths</h3>
-                <ul className="space-y-2">
-                  {feedback.strengths.map((strength, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="text-green-500 mr-2">•</span>
-                      <span className="text-green-700">{strength}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
 
-            {/* Suggestions */}
-            {feedback.suggestions && feedback.suggestions.length > 0 && (
-              <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-300 shadow-sm">
-                <h3 className="font-bold text-lg text-yellow-800 mb-3">💡 Speaking Improvement Tips</h3>
-                <ul className="space-y-2">
-                  {feedback.suggestions.map((suggestion, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="text-yellow-500 mr-2">•</span>
-                      <span className="text-yellow-700">{suggestion}</span>
-                    </li>
-                  ))}
-                </ul>
+            {/* No Mistakes Message */}
+            {(!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && (
+              <div className="bg-green-50 p-6 rounded-xl border border-green-300 shadow-sm text-center">
+                <div className="text-4xl mb-3">🎉</div>
+                <h3 className="text-xl font-bold text-green-800 mb-2">Excellent Speaking!</h3>
+                <p className="text-green-700">No grammar or fluency errors detected. Keep up the great work!</p>
               </div>
             )}
-
-            {/* AI Feedback from Gemini */}
-            {feedback.aiFeedback && (
-              <div className="bg-purple-50 p-4 rounded-xl border border-purple-300 shadow-sm">
-                <h3 className="font-bold text-lg text-purple-800 mb-2">🤖 AI Speech Analysis (Gemini)</h3>
-                <div className="bg-white p-3 rounded-lg border border-purple-200">
-                  <p className="text-purple-700 whitespace-pre-wrap text-sm leading-relaxed">
-                    {feedback.aiFeedback}
-                  </p>
-                </div>
-              </div>
-            )}
-
-
           </div>
         )}
       </div>

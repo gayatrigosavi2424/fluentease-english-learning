@@ -9,7 +9,14 @@ from ..services.notification_scheduler import notification_scheduler
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-db = firestore.client()
+
+# Initialize Firestore client lazily
+def get_db():
+    try:
+        return firestore.client()
+    except Exception as e:
+        logger.error(f"Failed to get Firestore client: {e}")
+        raise HTTPException(status_code=500, detail="Firebase not initialized")
 
 # Request schemas
 class NotificationPreferences(BaseModel):
@@ -40,6 +47,7 @@ class NotificationResponse(BaseModel):
 async def update_notification_preferences(request: UpdatePreferencesRequest):
     """Update user's notification preferences"""
     try:
+        db = get_db()
         # Store preferences in Firestore
         prefs_ref = db.collection('notification_preferences').document(request.user_id)
         prefs_ref.set(request.preferences.dict())
@@ -59,6 +67,7 @@ async def update_notification_preferences(request: UpdatePreferencesRequest):
 async def get_notification_preferences(user_id: str):
     """Get user's notification preferences"""
     try:
+        db = get_db()
         prefs_ref = db.collection('notification_preferences').document(user_id)
         prefs_doc = prefs_ref.get()
         
@@ -134,6 +143,7 @@ async def trigger_manual_check(background_tasks: BackgroundTasks):
 async def get_notification_history(user_id: str, days: int = 7):
     """Get user's notification history"""
     try:
+        db = get_db()
         notifications_ref = db.collection('notifications').document(user_id)
         notifications_doc = notifications_ref.get()
         
@@ -166,6 +176,7 @@ async def get_notification_history(user_id: str, days: int = 7):
 async def clear_notification_history(user_id: str):
     """Clear user's notification history"""
     try:
+        db = get_db()
         notifications_ref = db.collection('notifications').document(user_id)
         notifications_ref.delete()
         
@@ -182,6 +193,7 @@ async def clear_notification_history(user_id: str):
 async def get_notification_stats():
     """Get notification system statistics"""
     try:
+        db = get_db()
         # Get total users with preferences
         prefs_collection = db.collection('notification_preferences')
         prefs_docs = prefs_collection.stream()

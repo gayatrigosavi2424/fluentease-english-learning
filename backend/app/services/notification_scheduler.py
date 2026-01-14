@@ -11,8 +11,13 @@ logger = logging.getLogger(__name__)
 
 class NotificationScheduler:
     def __init__(self):
-        self.db = firestore.client()
-        self.is_running = False
+        try:
+            self.db = firestore.client()
+            self.is_running = False
+        except Exception as e:
+            logger.warning(f"Firebase not initialized in NotificationScheduler: {e}")
+            self.db = None
+            self.is_running = False
 
     async def check_inactive_users(self):
         """Check for users who haven't practiced today and send reminder emails"""

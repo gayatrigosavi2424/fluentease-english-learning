@@ -20,6 +20,7 @@ class SpeakResponse(BaseModel):
     mistakes: list
     strengths: list
     suggestions: list
+    question: str = ""  # The question/prompt given to user
 
 def calculate_pronunciation_score(transcript: str, feedback: str) -> int:
     """Calculate pronunciation score based on transcript quality and feedback"""
@@ -48,8 +49,8 @@ def calculate_pronunciation_score(transcript: str, feedback: str) -> int:
     
     return max(1, min(10, base_score))
 
-@router.post("/feedback", response_model=SpeakResponse)
-async def speak_feedback(file: UploadFile = File(...)):
+@router.post("/feedback")
+async def speak_feedback(file: UploadFile = File(...), question: str = ""):
     try:
         # Basic file validation
         if not file.filename:
@@ -87,68 +88,57 @@ async def speak_feedback(file: UploadFile = File(...)):
         
         try:
             # Get detailed feedback from Gemini
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
-            You are an expert English speaking coach analyzing speech from a language learner. Analyze this speech transcript for EXACT mistakes in grammar, pronunciation patterns, and fluency.
+You are an English-learning feedback assistant. The user will give a short spoken answer that may contain grammar mistakes.
 
-            SPEECH TRANSCRIPT: "{transcript}"
+USER'S ANSWER: "{transcript}"
 
-            For each mistake found, provide:
-            1. The EXACT word/phrase that is wrong (quote it exactly as spoken)
-            2. The EXACT correction needed
-            3. The specific speaking rule or reason
-            4. Whether it's a grammar, pronunciation, or fluency issue
+You must ALWAYS respond in the following 4 sections ONLY:
 
-            Format your response as:
+1. Grammar Corrections
+List 2-5 key grammar errors and their corrected forms.
+Format: ❌ Wrong → ✅ Correct
+NO explanations. NO long analysis.
 
-            MISTAKES_FOUND: [number]
+2. Vocabulary Improvements
+Suggest 2-4 better or more natural words/phrases.
+Format: 💡 "old phrase" → "better phrase"
+NO explanations.
 
-            EXACT_SPEECH_ERRORS:
-            ❌ MISTAKE: "exact wrong phrase from speech" 
-            ✅ CORRECTION: "exact correct phrase"
-            📝 REASON: [specific rule - grammar/pronunciation/fluency]
-            🎯 TYPE: [Grammar Error/Pronunciation Issue/Fluency Problem/Word Choice]
-            ---
-            ❌ MISTAKE: "another wrong phrase"
-            ✅ CORRECTION: "another correct phrase" 
-            📝 REASON: [specific rule]
-            🎯 TYPE: [error type]
-            ---
+3. Fluency Tips
+Give 1-2 short tips for improving sentence flow.
+NO grammar lectures. Keep it brief.
 
-            SPEECH_STRENGTHS:
-            ✅ [What they did well in their speech - be specific]
-            ✅ [Another strength]
+4. Improved Version
+Rewrite the user's answer into 2-3 clean, correct, natural sentences.
+NO extra details beyond the user's meaning.
 
-            SPEAKING_SUGGESTIONS:
-            💡 [Specific tip for pronunciation improvement]
-            💡 [Specific tip for grammar improvement]
-            💡 [Specific tip for fluency improvement]
+DETAILED_SCORES:
+PRONUNCIATION: [1-10]
+GRAMMAR: [1-10]
+FLUENCY: [1-10]
+VOCABULARY: [1-10]
 
-            DETAILED_SCORES:
-            PRONUNCIATION: [1-10] (clarity, accent, word stress)
-            GRAMMAR: [1-10] (sentence structure, verb tenses, articles)
-            FLUENCY: [1-10] (pace, hesitation, natural flow)
-            VOCABULARY: [1-10] (word choice, variety, appropriateness)
+OVERALL_SCORE: [1-10]
 
-            CORRECTED_SPEECH: [complete corrected version of what they should have said]
-
-            OVERALL_SCORE: [1-10]
-
-            IMPORTANT RULES:
-            - Quote speech mistakes EXACTLY as they appear in the transcript
-            - Focus on errors that affect communication clarity
-            - Be specific about pronunciation vs grammar vs fluency issues
-            - If no mistakes found, say "NO_SPEECH_MISTAKES_FOUND"
-            - Consider this is spoken language, not written, so be appropriate with corrections
-            """
+STRICT RULES:
+- Do NOT output detailed grammar analysis
+- Do NOT explain the reasons behind errors
+- Do NOT list repeated-word counts
+- Do NOT rewrite with extra information that the user didn't say
+- Do NOT penalize for punctuation, sentence length, or word repetition (this is SPEECH)
+- Keep everything short, simple, and structured
+- If no errors, say "NO_ERRORS_FOUND" and praise briefly
+"""
             
             response = model.generate_content(prompt)
             feedback_text = response.text
             
             print(f"✅ Gemini feedback received: {feedback_text}")
             
-            # Parse the enhanced structured feedback
+            # Parse the structured feedback
             detailed_scores = {}
             mistakes = []
             strengths = []
@@ -157,10 +147,6 @@ async def speak_feedback(file: UploadFile = File(...)):
             corrected_speech = ""
             
             try:
-                # Extract mistakes count
-                mistakes_count_match = re.search(r'MISTAKES_FOUND:\s*(\d+)', feedback_text)
-                mistakes_count = int(mistakes_count_match.group(1)) if mistakes_count_match else 0
-                
                 # Extract detailed scores
                 pronunciation_match = re.search(r'PRONUNCIATION:\s*(\d+)', feedback_text)
                 grammar_match = re.search(r'GRAMMAR:\s*(\d+)', feedback_text)
@@ -177,61 +163,52 @@ async def speak_feedback(file: UploadFile = File(...)):
                 if vocabulary_match:
                     detailed_scores['vocabulary'] = int(vocabulary_match.group(1))
                 
-                # Extract corrected speech
-                corrected_match = re.search(r'CORRECTED_SPEECH:\s*(.*?)(?=\n\nOVERALL_SCORE:|$)', feedback_text, re.DOTALL)
-                if corrected_match:
-                    corrected_speech = corrected_match.group(1).strip()
+                # Extract Grammar Corrections
+                grammar_section = re.search(r'GRAMMAR_CORRECTIONS:\s*(.*?)(?=\n\n\d+\.|VOCABULARY_IMPROVEMENTS:|$)', feedback_text, re.DOTALL)
+                if grammar_section:
+                    grammar_text = grammar_section.group(1).strip()
+                    grammar_lines = [line.strip() for line in grammar_text.split('\n') if line.strip() and '❌' in line]
+                    mistakes.extend(grammar_lines)
                 
-                # Extract individual mistakes
-                exact_errors_section = re.search(r'EXACT_SPEECH_ERRORS:\s*(.*?)(?=\nSPEECH_STRENGTHS:|$)', feedback_text, re.DOTALL)
+                # Extract Vocabulary Improvements
+                vocab_section = re.search(r'VOCABULARY_IMPROVEMENTS:\s*(.*?)(?=\n\n\d+\.|FLUENCY_TIPS:|$)', feedback_text, re.DOTALL)
+                if vocab_section:
+                    vocab_text = vocab_section.group(1).strip()
+                    vocab_lines = [line.strip() for line in vocab_text.split('\n') if line.strip() and '💡' in line]
+                    strengths.extend(vocab_lines)
                 
-                if "NO_SPEECH_MISTAKES_FOUND" in feedback_text or mistakes_count == 0:
-                    mistakes = ["✅ No speech errors found! Excellent speaking!"]
-                elif exact_errors_section:
-                    errors_text = exact_errors_section.group(1).strip()
-                    error_blocks = [block.strip() for block in errors_text.split('---') if block.strip()]
-                    
-                    for i, block in enumerate(error_blocks, 1):
-                        mistake_match = re.search(r'❌ MISTAKE:\s*"([^"]*)"', block)
-                        correction_match = re.search(r'✅ CORRECTION:\s*"([^"]*)"', block)
-                        reason_match = re.search(r'📝 REASON:\s*(.*?)(?=\n|🎯)', block)
-                        type_match = re.search(r'🎯 TYPE:\s*(.*?)(?=\n|$)', block)
-                        
-                        if mistake_match and correction_match:
-                            mistake = mistake_match.group(1)
-                            correction = correction_match.group(1)
-                            reason = reason_match.group(1) if reason_match else "Speech error"
-                            error_type = type_match.group(1) if type_match else "Speaking issue"
-                            
-                            mistakes.append(f"❌ \"{mistake}\" → ✅ \"{correction}\" ({error_type}: {reason})")
+                # Extract Fluency Tips
+                fluency_section = re.search(r'FLUENCY_TIPS:\s*(.*?)(?=\n\n\d+\.|IMPROVED_VERSION:|$)', feedback_text, re.DOTALL)
+                if fluency_section:
+                    fluency_text = fluency_section.group(1).strip()
+                    fluency_lines = [line.strip() for line in fluency_text.split('\n') if line.strip() and '💡' in line]
+                    suggestions.extend(fluency_lines)
                 
-                # Extract strengths
-                strengths_section = re.search(r'SPEECH_STRENGTHS:\s*(.*?)(?=\nSPEAKING_SUGGESTIONS:|$)', feedback_text, re.DOTALL)
-                if strengths_section:
-                    strengths_text = strengths_section.group(1).strip()
-                    strengths = [line.strip() for line in strengths_text.split('\n') if line.strip().startswith('✅')]
+                # Extract Improved Version
+                improved_match = re.search(r'IMPROVED_VERSION:\s*(.*?)(?=\n\nDETAILED_SCORES:|$)', feedback_text, re.DOTALL)
+                if improved_match:
+                    corrected_speech = improved_match.group(1).strip()
                 
-                # Extract suggestions
-                suggestions_section = re.search(r'SPEAKING_SUGGESTIONS:\s*(.*?)(?=\nDETAILED_SCORES:|$)', feedback_text, re.DOTALL)
-                if suggestions_section:
-                    suggestions_text = suggestions_section.group(1).strip()
-                    suggestions = [line.strip() for line in suggestions_text.split('\n') if line.strip().startswith('💡')]
+                # Check if no errors found
+                if "NO_ERRORS_FOUND" in feedback_text:
+                    mistakes = ["✅ No errors found! Excellent speaking!"]
+                    strengths = ["✅ Perfect grammar and vocabulary"]
+                    suggestions = ["💡 Keep up the great work!"]
                 
-                # Create overall comment
-                if corrected_speech:
-                    overall_comment = f"📊 SPEECH ANALYSIS RESULTS: {mistakes_count} issue(s) found\n\n"
-                    if mistakes_count > 0:
-                        overall_comment += f"📝 CORRECTED VERSION:\n\"{corrected_speech}\""
-                    else:
-                        overall_comment += "✅ EXCELLENT! Your speech was clear and grammatically correct!"
+                # If no mistakes parsed, add default
+                if not mistakes:
+                    mistakes = ["✅ Good job! Minor improvements suggested below."]
+                
+                # Return the full formatted feedback from Gemini
+                overall_comment = feedback_text
                         
             except Exception as parse_error:
                 print(f"Parsing error: {parse_error}")
                 # Fallback if parsing fails
                 detailed_scores = {'pronunciation': 7, 'grammar': 7, 'fluency': 7, 'vocabulary': 7}
-                mistakes = ["Unable to analyze specific mistakes - using general feedback"]
-                strengths = ["✅ Good effort in speaking practice"]
-                suggestions = ["💡 Keep practicing regularly", "💡 Focus on clear pronunciation"]
+                mistakes = ["✅ Good effort in speaking practice"]
+                strengths = ["💡 Keep practicing regularly"]
+                suggestions = ["💡 Focus on clear pronunciation"]
                 overall_comment = "Good job practicing your speaking skills!"
             
             # Calculate overall score
@@ -247,7 +224,8 @@ async def speak_feedback(file: UploadFile = File(...)):
                 detailed_scores=detailed_scores,
                 mistakes=mistakes,
                 strengths=strengths,
-                suggestions=suggestions
+                suggestions=suggestions,
+                question=question
             )
             
         except Exception as gemini_error:
@@ -264,7 +242,8 @@ async def speak_feedback(file: UploadFile = File(...)):
                 },
                 mistakes=["Unable to analyze - AI service temporarily unavailable"],
                 strengths=["Good effort in speaking practice", "Completed the speaking exercise"],
-                suggestions=["Keep practicing regularly", "Focus on clear pronunciation", "Try speaking for longer periods"]
+                suggestions=["Keep practicing regularly", "Focus on clear pronunciation", "Try speaking for longer periods"],
+                question=question
             )
             
     except Exception as e:
@@ -281,5 +260,6 @@ async def speak_feedback(file: UploadFile = File(...)):
             },
             mistakes=["Audio processing error - please try again"],
             strengths=["Attempted the speaking exercise"],
-            suggestions=["Try again in a few moments", "Ensure good microphone quality", "Speak clearly and at moderate pace"]
+            suggestions=["Try again in a few moments", "Ensure good microphone quality", "Speak clearly and at moderate pace"],
+            question=question
         )
