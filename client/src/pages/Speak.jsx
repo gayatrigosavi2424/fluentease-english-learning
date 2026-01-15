@@ -39,6 +39,7 @@ export default function Speak({ onProgressUpdate }) {
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.maxAlternatives = 1;
       
       // Handle results
       recognitionRef.current.onresult = (event) => {
@@ -70,17 +71,38 @@ export default function Speak({ onProgressUpdate }) {
       recognitionRef.current.onend = () => {
         setIsListening(false);
         console.log('Speech recognition ended');
+        
+        // Auto-restart if still recording
+        if (isRecording && seconds > 0) {
+          try {
+            console.log('Auto-restarting speech recognition...');
+            recognitionRef.current.start();
+          } catch (error) {
+            console.log('Could not restart:', error);
+          }
+        }
       };
       
-      // Handle errors
+      // Handle errors with better recovery
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
         
-        if (event.error === 'not-allowed') {
-          toast.error('Microphone access denied. Please allow microphone access.');
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          toast.error('🎤 Microphone access denied. Please allow microphone access in your browser settings.');
+          setIsRecording(false);
+          clearInterval(timerRef.current);
         } else if (event.error === 'no-speech') {
-          toast.warning('No speech detected. Please try speaking louder.');
+          // Don't show error for no-speech, just continue listening
+          console.log('No speech detected, continuing...');
+        } else if (event.error === 'network') {
+          // Network error - try to continue
+          console.log('Network error, will retry...');
+          toast.warning('Network issue detected. Continuing to listen...');
+        } else if (event.error === 'aborted') {
+          console.log('Recognition aborted');
+        } else {
+          toast.warning(`Speech recognition issue: ${event.error}. Continuing...`);
         }
       };
     }
@@ -88,7 +110,7 @@ export default function Speak({ onProgressUpdate }) {
 
   const startRecording = () => {
     if (!recognitionRef.current) {
-      toast.error('Speech recognition not supported in this browser. Please use Chrome.');
+      toast.error('🎤 Speech recognition not supported. Please use Chrome or Edge browser.');
       return;
     }
 
@@ -100,11 +122,28 @@ export default function Speak({ onProgressUpdate }) {
     try {
       recognitionRef.current.start();
       setTranscript("🎤 Listening... Start speaking!");
+      toast.info('🎤 Microphone activated! Start speaking now.');
     } catch (error) {
       console.error('Error starting recognition:', error);
-      toast.error('Failed to start speech recognition. Please try again.');
-      setIsRecording(false);
-      return;
+      
+      // If already started, stop and restart
+      if (error.message && error.message.includes('already started')) {
+        try {
+          recognitionRef.current.stop();
+          setTimeout(() => {
+            recognitionRef.current.start();
+            setTranscript("🎤 Listening... Start speaking!");
+          }, 100);
+        } catch (retryError) {
+          toast.error('Failed to start speech recognition. Please refresh the page.');
+          setIsRecording(false);
+          return;
+        }
+      } else {
+        toast.error('Failed to start speech recognition. Please check microphone permissions.');
+        setIsRecording(false);
+        return;
+      }
     }
 
     // Start timer
@@ -887,12 +926,21 @@ export default function Speak({ onProgressUpdate }) {
               </div>
             )}
 
-            {/* No Mistakes Message */}
-            {(!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && (
+            {/* No Mistakes Message - Only show if score is actually good */}
+            {(!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && feedback.score >= 7 && (
               <div className="bg-green-50 p-6 rounded-xl border border-green-300 shadow-sm text-center">
                 <div className="text-4xl mb-3">🎉</div>
                 <h3 className="text-xl font-bold text-green-800 mb-2">Excellent Speaking!</h3>
                 <p className="text-green-700">No grammar or fluency errors detected. Keep up the great work!</p>
+              </div>
+            )}
+            
+            {/* Poor Response Message - Show if score is low */}
+            {feedback.score < 5 && (!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && (
+              <div className="bg-orange-50 p-6 rounded-xl border border-orange-300 shadow-sm text-center">
+                <div className="text-4xl mb-3">⚠️</div>
+                <h3 className="text-xl font-bold text-orange-800 mb-2">Incomplete Response</h3>
+                <p className="text-orange-700">Your response seems too short or incomplete. Try speaking more about the topic!</p>
               </div>
             )}
           </div>

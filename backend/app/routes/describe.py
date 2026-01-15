@@ -127,55 +127,80 @@ async def describe_feedback(request: DescribeRequest):
         if not request.text.strip():
             raise HTTPException(status_code=400, detail="Description cannot be empty")
         
-        # Try to use Gemini API
+        # Try to use Gemini API with improved prompt
         try:
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            prompt = f"""
-            Analyze this image description for:
-            1. Descriptive language and vocabulary
-            2. Detail and completeness
-            3. Grammar and sentence structure
-            4. Use of adjectives and sensory details
-            5. Overall clarity and engagement
-            
-            Description to analyze:
-            "{request.text}"
-            
-            Provide constructive feedback focusing on:
-            - What was described well
-            - Areas for improvement
-            - Suggestions for more vivid or detailed descriptions
-            - Grammar or vocabulary suggestions
-            
-            Be encouraging and specific in your feedback.
-            """
+            prompt = f"""You are an expert English teacher analyzing a student's image description. Provide detailed, specific feedback.
+
+STUDENT'S DESCRIPTION: "{request.text}"
+
+Analyze this description and provide feedback in EXACTLY this format:
+
+## GRAMMAR ERRORS
+List SPECIFIC grammar mistakes found in the text. For each error:
+- Quote the EXACT wrong phrase from the text
+- Show the correct version
+- Explain WHY it's wrong in one sentence
+Format: ❌ "exact wrong phrase" → ✅ "correct phrase" (Reason: brief explanation)
+
+If NO grammar errors: Write "✅ No grammar errors found"
+
+## VOCABULARY & DESCRIPTIVE LANGUAGE
+Identify:
+- Better word choices for more vivid descriptions
+- Missing descriptive details (colors, sizes, emotions, actions)
+- Repetitive words
+Format: 💡 "current phrase" → "better alternative" (Why: brief reason)
+
+If vocabulary is good: Write "✅ Good descriptive vocabulary"
+
+## DESCRIPTION QUALITY
+Analyze:
+- Is the description detailed enough?
+- Are sensory details included (sight, sound, feeling)?
+- Does it paint a clear picture?
+Format: 📝 Issue → Suggestion
+
+If description is good: Write "✅ Clear and detailed description"
+
+## IMPROVED VERSION
+Rewrite the ENTIRE description with ALL corrections and improvements applied. Make it more vivid and detailed while keeping the same core meaning.
+
+## SCORE JUSTIFICATION
+Explain the score (1-10) based on:
+- Grammar accuracy
+- Descriptive vocabulary richness
+- Level of detail
+- Overall clarity and vividness
+
+IMPORTANT RULES:
+- Quote EXACT phrases from the student's text
+- Be specific, not generic
+- Focus on descriptive writing quality
+- If the description is good, say so clearly"""
             
             response = model.generate_content(prompt)
             feedback = response.text
             
         except Exception as gemini_error:
+            print(f"Gemini error: {gemini_error}")
             # Fallback feedback if Gemini fails
             word_count = len(request.text.split())
-            sentence_count = len([s for s in request.text.split('.') if s.strip()])
             
-            feedback = f"""Great job on your description! Here's some feedback:
+            feedback = f"""## DESCRIPTION ANALYSIS
 
-✅ What you did well:
-- You wrote {word_count} words, showing good effort
-- Your description shows attention to detail
+✅ Good effort! You wrote {word_count} words.
 
-💡 Areas for improvement:
-- Try to use more descriptive adjectives (colors, sizes, emotions)
-- Consider describing what people might be feeling or thinking
-- Add sensory details (what might you hear, smell, or feel?)
+## SUGGESTIONS
+💡 Try to use more descriptive adjectives (colors, sizes, emotions)
+💡 Add sensory details (what might you hear, smell, or feel?)
+💡 Describe the mood or atmosphere of the scene
 
-🎯 Suggestions:
-- Use varied sentence structures to make your writing more engaging
-- Practice describing not just what you see, but the mood or atmosphere
-- Keep practicing - descriptive writing improves with experience!
+## IMPROVED VERSION
+{request.text}
 
-Keep up the excellent work! 🌟"""
+Keep practicing - descriptive writing improves with experience!"""
         
         # Calculate score
         score = calculate_description_score(request.text, feedback)
@@ -186,8 +211,9 @@ Keep up the excellent work! 🌟"""
         )
         
     except Exception as e:
+        print(f"Description feedback error: {e}")
         # Final fallback
         return DescribeResponse(
-            feedback="Thank you for your description! Keep practicing your descriptive writing skills. Focus on using vivid adjectives and detailed observations.",
+            feedback="Thank you for your description! Keep practicing your descriptive writing skills.",
             score=6
         )

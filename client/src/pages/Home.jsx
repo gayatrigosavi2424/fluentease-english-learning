@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-[#ecf0f3] to-[#dbeafe] flex items-center justify-center px-4">
-      <div className="bg-white/60 backdrop-blur-md shadow-2xl border border-white/20 rounded-3xl p-10 max-w-4xl w-full space-y-8">
+    <div className="h-screen overflow-hidden bg-gradient-to-tr from-[#ecf0f3] to-[#dbeafe] flex items-center justify-center px-4">
+      <div className="bg-white/60 backdrop-blur-md shadow-2xl border border-white/20 rounded-3xl p-10 max-w-4xl w-full space-y-6">
         <h1 className="text-4xl md:text-5xl font-extrabold text-center text-blue-800">
           Speak • Write • Improve
         </h1>

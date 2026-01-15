@@ -13,8 +13,8 @@ router = APIRouter()
 # ---------------- Schemas ---------------- #
 
 class GrammarRequest(BaseModel):
-    topic: str
     text: str
+    topic: str = None  # Optional topic for context
 
 class GrammarResponse(BaseModel):
     input_text: str

@@ -104,20 +104,6 @@ export default function Dashboard({ refresh }) {
           <h2 className="text-4xl font-bold text-blue-900 mb-4">
             📊 Your Learning Dashboard
           </h2>
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => fetchProgressRef.current(true)}
-              disabled={loading || isUpdating}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 text-sm"
-            >
-              {loading || isUpdating ? "🔄 Refreshing..." : "🔄 Refresh Progress"}
-            </button>
-            {lastUpdated && (
-              <span className="text-gray-600 text-sm">
-                Last updated: {lastUpdated}
-              </span>
-            )}
-          </div>
         </div>
 
         {loading ? (

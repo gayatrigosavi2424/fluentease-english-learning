@@ -163,35 +163,23 @@ const Describe = ({ onProgressUpdate }) => {
     try {
       console.log("Analyzing description:", currentTranscript);
       
-      // Use Gemini to analyze the description
-      const result = await checkGrammar(currentTranscript, "describe");
+      // Use the describe feedback endpoint
+      const result = await getDescriptionFeedback(currentTranscript);
       
       // Create detailed feedback for description
       const score = Math.max(1, Math.min(10, result.score || 7));
       
       setFeedback({
-        feedback: result.feedback || "Good description! Keep practicing to improve your descriptive skills.",
+        aiFeedback: result.feedback || null,
+        correctedText: currentTranscript,
         score: score,
         detailed_scores: {
-          description_quality: Math.max(1, Math.min(10, score + Math.floor(Math.random() * 2) - 1)),
-          grammar: score,
+          description_quality: Math.max(1, Math.min(10, score)),
+          grammar: Math.max(1, Math.min(10, score)),
           vocabulary: Math.max(1, Math.min(10, score + Math.floor(Math.random() * 2) - 1)),
           detail_level: Math.max(1, Math.min(10, Math.min(10, currentTranscript.length / 20)))
         },
-        mistakes: result.corrected && result.corrected !== currentTranscript ? 
-          [`Grammar suggestion: "${result.corrected}"`] : 
-          ["No major grammar issues found!"],
-        strengths: [
-          "Successfully described the image using speech",
-          "Good effort in verbal description",
-          currentTranscript.length > 50 ? "Provided detailed description" : "Clear and concise description"
-        ],
-        suggestions: [
-          "Try to include more sensory details (colors, sizes, emotions)",
-          "Describe not just what you see, but what might be happening",
-          "Use varied vocabulary to make descriptions more vivid",
-          "Practice describing different types of images"
-        ]
+        exactMistakes: []
       });
 
       // Save progress
@@ -208,7 +196,8 @@ const Describe = ({ onProgressUpdate }) => {
       const score = Math.max(3, Math.min(8, Math.floor(currentTranscript.length / 10)));
       
       setFeedback({
-        feedback: "Good effort in describing the image! Keep practicing your descriptive skills.",
+        aiFeedback: null,
+        correctedText: currentTranscript,
         score: score,
         detailed_scores: { 
           description_quality: score, 
@@ -216,10 +205,10 @@ const Describe = ({ onProgressUpdate }) => {
           vocabulary: score, 
           detail_level: score 
         },
-        mistakes: ["Analysis temporarily unavailable"],
-        strengths: ["Completed the description exercise"],
-        suggestions: ["Keep practicing", "Try describing more details", "Use varied vocabulary"]
+        exactMistakes: []
       });
+      
+      toast.warning('Using local analysis - AI temporarily unavailable');
     }
     
     setLoading(false);
@@ -248,7 +237,6 @@ const Describe = ({ onProgressUpdate }) => {
                   e.target.src = "https://via.placeholder.com/400x300?text=Image+Not+Available";
                 }}
               />
-              <p className="mt-2 text-sm text-gray-600 italic">{image.prompt}</p>
             </div>
 
             {/* Timer */}
@@ -348,14 +336,78 @@ const Describe = ({ onProgressUpdate }) => {
           <div className="space-y-4">
             {/* Overall Score */}
             <div className="bg-purple-50 p-4 rounded-xl border border-purple-300 shadow-sm text-center">
-              <h3 className="font-bold text-xl text-purple-800 mb-2">🎯 Description Score</h3>
+              <h3 className="font-bold text-xl text-purple-800 mb-2">🎯 Your Score</h3>
               <div className="text-4xl font-bold text-purple-600">{feedback.score || 0}/10</div>
             </div>
+
+            {/* AI Feedback from Gemini - MAIN SECTION */}
+            {feedback.aiFeedback && (
+              <div className="bg-white p-6 rounded-xl border-2 border-purple-300 shadow-lg">
+                <h3 className="font-bold text-xl text-purple-800 mb-4 flex items-center">
+                  <span className="text-2xl mr-2">🤖</span>
+                  AI Grammar & Fluency Analysis
+                </h3>
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="text-gray-800 whitespace-pre-wrap text-sm leading-relaxed">
+                    {feedback.aiFeedback}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Exact Grammar Mistakes */}
+            {feedback.exactMistakes && feedback.exactMistakes.length > 0 && (
+              <div className="bg-red-50 p-4 rounded-xl border border-red-300 shadow-sm">
+                <h3 className="font-bold text-lg text-red-800 mb-3">
+                  ❌ Grammar Mistakes Found: {feedback.exactMistakes.length}
+                </h3>
+                <div className="space-y-3">
+                  {feedback.exactMistakes.map((mistake, index) => (
+                    <div key={index} className="bg-white p-3 rounded-lg border border-red-200">
+                      <div className="flex items-start gap-2">
+                        <span className="text-red-600 font-bold text-sm">{mistake.type}</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-red-600">❌</span>
+                          <span className="text-red-700 font-medium">{mistake.wrong}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-600">✅</span>
+                          <span className="text-green-700 font-medium">{mistake.correct}</span>
+                        </div>
+                        <div className="ml-6 mt-1">
+                          <span className="text-blue-700 text-sm">{mistake.rule}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No Mistakes Message - Only show if score is actually good */}
+            {(!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && feedback.score >= 7 && (
+              <div className="bg-green-50 p-6 rounded-xl border border-green-300 shadow-sm text-center">
+                <div className="text-4xl mb-3">🎉</div>
+                <h3 className="text-xl font-bold text-green-800 mb-2">Excellent Description!</h3>
+                <p className="text-green-700">No grammar or fluency errors detected. Keep up the great work!</p>
+              </div>
+            )}
+            
+            {/* Poor Response Message - Show if score is low */}
+            {feedback.score < 5 && (!feedback.exactMistakes || feedback.exactMistakes.length === 0) && !feedback.aiFeedback && (
+              <div className="bg-orange-50 p-6 rounded-xl border border-orange-300 shadow-sm text-center">
+                <div className="text-4xl mb-3">⚠️</div>
+                <h3 className="text-xl font-bold text-orange-800 mb-2">Incomplete Description</h3>
+                <p className="text-orange-700">Your description seems too short or incomplete. Try describing more details about the image!</p>
+              </div>
+            )}
 
             {/* Detailed Scores */}
             {feedback.detailed_scores && Object.keys(feedback.detailed_scores).length > 0 && (
               <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-300 shadow-sm">
-                <h3 className="font-bold text-lg text-indigo-800 mb-3">📊 Detailed Analysis</h3>
+                <h3 className="font-bold text-lg text-indigo-800 mb-3">📊 Detailed Scores</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.entries(feedback.detailed_scores).map(([category, score]) => (
                     <div key={category} className="text-center bg-white p-3 rounded-lg">
@@ -365,63 +417,6 @@ const Describe = ({ onProgressUpdate }) => {
                       <div className="text-2xl font-bold text-indigo-600">{score}/10</div>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Mistakes/Issues */}
-            {feedback.mistakes && feedback.mistakes.length > 0 && (
-              <div className="bg-red-50 p-4 rounded-xl border border-red-300 shadow-sm">
-                <h3 className="font-bold text-lg text-red-800 mb-3">❌ Areas for Improvement</h3>
-                <ul className="space-y-2">
-                  {feedback.mistakes.map((mistake, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="text-red-500 mr-2">•</span>
-                      <span className="text-red-700">{mistake}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Strengths */}
-            {feedback.strengths && feedback.strengths.length > 0 && (
-              <div className="bg-green-50 p-4 rounded-xl border border-green-300 shadow-sm">
-                <h3 className="font-bold text-lg text-green-800 mb-3">✅ Your Strengths</h3>
-                <ul className="space-y-2">
-                  {feedback.strengths.map((strength, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="text-green-500 mr-2">•</span>
-                      <span className="text-green-700">{strength}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Suggestions */}
-            {feedback.suggestions && feedback.suggestions.length > 0 && (
-              <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-300 shadow-sm">
-                <h3 className="font-bold text-lg text-yellow-800 mb-3">💡 Description Tips</h3>
-                <ul className="space-y-2">
-                  {feedback.suggestions.map((suggestion, index) => (
-                    <li key={index} className="flex items-start">
-                      <span className="text-yellow-500 mr-2">•</span>
-                      <span className="text-yellow-700">{suggestion}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* AI Feedback */}
-            {feedback.feedback && (
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-300 shadow-sm">
-                <h3 className="font-bold text-lg text-blue-800 mb-2">🤖 AI Analysis</h3>
-                <div className="bg-white p-3 rounded-lg border border-blue-200">
-                  <p className="text-blue-700 whitespace-pre-wrap text-sm leading-relaxed">
-                    {feedback.feedback}
-                  </p>
                 </div>
               </div>
             )}

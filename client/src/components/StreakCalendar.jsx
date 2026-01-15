@@ -12,6 +12,18 @@ const StreakCalendar = ({ userId }) => {
         }
     }, [userId]);
 
+    // Auto-refresh calendar every 30 seconds to show new activities
+    useEffect(() => {
+        if (!userId) return;
+
+        const interval = setInterval(() => {
+            console.log('🔄 Auto-refreshing calendar...');
+            loadCalendarData();
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(interval);
+    }, [userId]);
+
     const loadCalendarData = async () => {
         try {
             setLoading(true);
@@ -27,10 +39,10 @@ const StreakCalendar = ({ userId }) => {
     const getColorClass = (level) => {
         const colors = {
             0: 'bg-gray-100 border-gray-200', // No activity
-            1: 'bg-green-100 border-green-200', // 1 activity
-            2: 'bg-green-300 border-green-400', // 2 activities
-            3: 'bg-green-500 border-green-600', // 3 activities
-            4: 'bg-green-700 border-green-800'  // 3+ activities
+            1: 'bg-green-200 border-green-300', // 1 activity
+            2: 'bg-green-400 border-green-500', // 2 activities
+            3: 'bg-green-600 border-green-700', // 3 activities
+            4: 'bg-green-800 border-green-900'  // 3+ activities
         };
         return colors[level] || colors[0];
     };
@@ -56,52 +68,49 @@ const StreakCalendar = ({ userId }) => {
         return `${dayData.count} ${dayData.count === 1 ? 'activity' : 'activities'}: ${activities.join(', ')}`;
     };
 
-    const groupByWeeks = (data) => {
-        const weeks = [];
-        let currentWeek = [];
+    const getMonthData = (offset) => {
+        const today = new Date();
+        const targetDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+        const year = targetDate.getFullYear();
+        const month = targetDate.getMonth();
 
-        // Add empty days at the beginning if needed
-        const firstDay = data[0];
-        if (firstDay) {
-            const startPadding = firstDay.dayOfWeek;
-            for (let i = 0; i < startPadding; i++) {
-                currentWeek.push(null);
-            }
-        }
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDayOfWeek = firstDay.getDay();
+        const daysInMonth = lastDay.getDate();
 
-        data.forEach((day, index) => {
-            currentWeek.push(day);
-
-            if (currentWeek.length === 7) {
-                weeks.push([...currentWeek]);
-                currentWeek = [];
-            }
+        const monthData = calendarData.filter(day => {
+            const dayDate = new Date(day.date);
+            return dayDate.getMonth() === month && dayDate.getFullYear() === year;
         });
 
-        // Add remaining days
-        if (currentWeek.length > 0) {
-            while (currentWeek.length < 7) {
-                currentWeek.push(null);
-            }
-            weeks.push(currentWeek);
+        const grid = [];
+
+        for (let i = 0; i < startDayOfWeek; i++) {
+            grid.push(null);
         }
 
-        return weeks;
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            const dayData = monthData.find(d => d.date === dateStr);
+            grid.push(dayData || { date: dateStr, count: 0, level: 0, activities: {} });
+        }
+
+        return {
+            grid,
+            monthName: targetDate.toLocaleDateString('en-US', { month: 'short' }),
+            fullMonthName: targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            year,
+            month
+        };
     };
 
-    const getMonthLabels = () => {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const labels = [];
-        const today = new Date();
-
-        for (let i = 11; i >= 0; i--) {
-            const date = new Date(today);
-            date.setMonth(date.getMonth() - i);
-            labels.push(months[date.getMonth()]);
+    const getAllMonths = () => {
+        const months = [];
+        for (let i = -11; i <= 0; i++) {
+            months.push(getMonthData(i));
         }
-
-        return labels;
+        return months;
     };
 
     if (loading) {
@@ -109,22 +118,17 @@ const StreakCalendar = ({ userId }) => {
             <div className="bg-white p-6 rounded-xl shadow-sm border">
                 <div className="animate-pulse">
                     <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-                    <div className="grid grid-cols-53 gap-1">
-                        {Array.from({ length: 365 }).map((_, i) => (
-                            <div key={i} className="w-3 h-3 bg-gray-200 rounded-sm"></div>
-                        ))}
-                    </div>
+                    <div className="h-64 bg-gray-200 rounded"></div>
                 </div>
             </div>
         );
     }
 
-    const weeks = groupByWeeks(calendarData);
-    const monthLabels = getMonthLabels();
+    const allMonths = getAllMonths();
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="mb-4">
+            <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">
                     📅 Learning Activity Calendar
                 </h3>
@@ -133,76 +137,106 @@ const StreakCalendar = ({ userId }) => {
                 </p>
             </div>
 
-            <div className="relative">
-                {/* Month labels */}
-                <div className="flex justify-between text-xs text-gray-500 mb-2 px-4">
-                    {monthLabels.map((month, index) => (
-                        <span key={index}>{month}</span>
-                    ))}
-                </div>
+            {/* Scrollable months container */}
+            <div className="overflow-x-auto pb-4">
+                <div className="flex gap-6">
+                    {allMonths.map((monthData, monthIndex) => {
+                        const weeks = [];
+                        for (let i = 0; i < monthData.grid.length; i += 7) {
+                            weeks.push(monthData.grid.slice(i, i + 7));
+                        }
 
-                {/* Day labels */}
-                <div className="flex flex-col text-xs text-gray-500 absolute -left-8 top-8">
-                    <span className="h-3 flex items-center">Mon</span>
-                    <span className="h-3 flex items-center mt-1">Wed</span>
-                    <span className="h-3 flex items-center mt-1">Fri</span>
-                </div>
+                        return (
+                            <div key={monthIndex} className="flex-shrink-0">
+                                {/* Month label */}
+                                <div className="text-center mb-2">
+                                    <h4 className="text-sm font-bold text-gray-700">{monthData.monthName}</h4>
+                                </div>
 
-                {/* Calendar grid */}
-                <div className="grid grid-cols-53 gap-1">
-                    {weeks.map((week, weekIndex) =>
-                        week.map((day, dayIndex) => (
-                            <div
-                                key={`${weekIndex}-${dayIndex}`}
-                                className={`w-3 h-3 rounded-sm border cursor-pointer transition-all duration-200 hover:scale-110 ${day ? getColorClass(day.level) : 'bg-transparent border-transparent'
-                                    }`}
-                                onMouseEnter={() => day && setHoveredDay(day)}
-                                onMouseLeave={() => setHoveredDay(null)}
-                                title={day ? `${formatDate(day.date)}: ${getActivityText(day)}` : ''}
-                            />
-                        ))
-                    )}
-                </div>
+                                {/* Calendar Grid */}
+                                <div className="border rounded-lg overflow-hidden bg-gray-50">
+                                    {/* Day headers */}
+                                    <div className="grid grid-cols-7 bg-gray-100 border-b">
+                                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                                            <div key={idx} className="text-center py-1 text-[9px] font-semibold text-gray-600 w-8">
+                                                {day}
+                                            </div>
+                                        ))}
+                                    </div>
 
-                {/* Legend */}
-                <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
-                    <span>Less</span>
-                    <div className="flex gap-1">
-                        {[0, 1, 2, 3, 4].map(level => (
-                            <div
-                                key={level}
-                                className={`w-3 h-3 rounded-sm border ${getColorClass(level)}`}
-                            />
-                        ))}
-                    </div>
-                    <span>More</span>
+                                    {/* Calendar days */}
+                                    <div className="bg-white p-1">
+                                        {weeks.map((week, weekIndex) => (
+                                            <div key={weekIndex} className="flex gap-0.5 mb-0.5 last:mb-0">
+                                                {week.map((day, dayIndex) => (
+                                                    <div
+                                                        key={dayIndex}
+                                                        className="w-8 h-8 flex items-center justify-center"
+                                                    >
+                                                        {day ? (
+                                                            <div
+                                                                className={`w-7 h-7 rounded-sm border cursor-pointer transition-all duration-200 hover:scale-125 hover:shadow-md flex items-center justify-center ${getColorClass(day.level)}`}
+                                                                onMouseEnter={() => setHoveredDay(day)}
+                                                                onMouseLeave={() => setHoveredDay(null)}
+                                                                title={`${formatDate(day.date)}: ${getActivityText(day)}`}
+                                                            >
+                                                                <span className="text-[9px] font-medium text-gray-700">
+                                                                    {new Date(day.date).getDate()}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-7 h-7"></div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-600">
+                <span>Less</span>
+                {[0, 1, 2, 3, 4].map(level => (
+                    <div
+                        key={level}
+                        className={`w-4 h-4 rounded border-2 ${getColorClass(level)}`}
+                    />
+                ))}
+                <span>More</span>
             </div>
 
             {/* Hover tooltip */}
             {hoveredDay && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
-                    <div className="text-sm font-medium text-gray-800">
+                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+                    <div className="text-sm font-semibold text-gray-800 mb-1">
                         {formatDate(hoveredDay.date)}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 mb-2">
                         {getActivityText(hoveredDay)}
                     </div>
-                    {hoveredDay.activities.speak && (
-                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mt-1">
-                            🎤 Speaking
-                        </span>
-                    )}
-                    {hoveredDay.activities.write && (
-                        <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1 mt-1">
-                            ✍️ Writing
-                        </span>
-                    )}
-                    {hoveredDay.activities.describe && (
-                        <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded mr-1 mt-1">
-                            🖼️ Describing
-                        </span>
-                    )}
+                    <div className="flex gap-2 flex-wrap">
+                        {hoveredDay.activities.speak && (
+                            <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-medium">
+                                🎤 Speaking
+                            </span>
+                        )}
+                        {hoveredDay.activities.write && (
+                            <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-medium">
+                                ✍️ Writing
+                            </span>
+                        )}
+                        {hoveredDay.activities.describe && (
+                            <span className="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded font-medium">
+                                🖼️ Describing
+                            </span>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

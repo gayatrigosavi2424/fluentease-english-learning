@@ -245,9 +245,21 @@ export default function Write({ onProgressUpdate }) {
     if (sentences.length < 2) suggestions.push('💡 Use multiple sentences for better flow');
     suggestions.push('💡 Read your writing aloud to check if it sounds natural');
     
+    // Remove duplicate mistakes (same type, wrong, and correct)
+    const uniqueMistakes = [];
+    const seen = new Set();
+    
+    exactMistakes.forEach(mistake => {
+      const key = `${mistake.type}|${mistake.wrong}|${mistake.correct}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueMistakes.push(mistake);
+      }
+    });
+    
     // Calculate precise score
     let score = 8; // Base score
-    score -= Math.min(exactMistakes.length * 1.2, 6); // Deduct 1.2 points per mistake, max 6
+    score -= Math.min(uniqueMistakes.length * 1.2, 6); // Deduct 1.2 points per unique mistake, max 6
     if (wordCount < 10) score -= 2;
     if (wordCount >= 30) score += 0.5;
     if (sentences.length >= 2) score += 0.5;
@@ -255,9 +267,9 @@ export default function Write({ onProgressUpdate }) {
     
     return {
       score: Math.max(1, Math.min(10, Math.round(score))),
-      exactMistakes: exactMistakes.length > 0 ? exactMistakes : [],
-      mistakes: exactMistakes.length > 0 ? 
-        exactMistakes.map(m => `❌ ${m.wrong} → ✅ ${m.correct} (${m.rule})`) : 
+      exactMistakes: uniqueMistakes.length > 0 ? uniqueMistakes : [],
+      mistakes: uniqueMistakes.length > 0 ? 
+        uniqueMistakes.map(m => `❌ ${m.wrong} → ✅ ${m.correct} (${m.rule})`) : 
         ['✅ No grammar mistakes found! Excellent work!'],
       strengths,
       suggestions,
