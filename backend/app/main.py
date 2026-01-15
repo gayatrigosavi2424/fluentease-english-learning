@@ -32,7 +32,12 @@ app = FastAPI(title="English Learning App Backend")
 # Add CORS middleware first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite dev server + React
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://localhost:3000",
+        "https://fluentease-english-learning.vercel.app",
+        "https://*.vercel.app"  # Allow all Vercel preview deployments
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
