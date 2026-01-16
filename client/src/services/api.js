@@ -2,7 +2,28 @@
 import axios from "axios";
 import { updateUserProgress as updateProgressFirebase } from "./progress";
 
-const BASE_URL = "http://127.0.0.1:8000"; // Your FastAPI backend
+// Determine backend URL based on environment
+const getBackendURL = () => {
+  // If we're on Vercel (production), use the deployed backend
+  if (window.location.hostname.includes('vercel.app')) {
+    return 'https://fluentease-english-learning.onrender.com';
+  }
+  
+  // Check for environment variable
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  // Default to localhost for development
+  return 'http://127.0.0.1:8000';
+};
+
+const BASE_URL = getBackendURL();
+
+// Debug: Log the backend URL being used
+console.log("🔧 Backend URL:", BASE_URL);
+console.log("🔧 Hostname:", window.location.hostname);
+console.log("🔧 Environment:", import.meta.env.MODE);
 
 /**
  * Check grammar for a given text
